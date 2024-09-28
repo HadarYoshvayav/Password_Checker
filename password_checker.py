@@ -1,6 +1,10 @@
 import requests
 import re
 import hashlib
+from colorama import init, Fore, Style
+import pyfiglet
+
+init(autoreset=True)
 
 def check_password_strength(password):
     length_check = len(password) >= 8
@@ -26,35 +30,52 @@ def check_password_strength(password):
         "suggestions": suggestions
     }
 
-def check_password_breach(password):
-    hashed_password = hash_password(password)
-    url = f"https://api.pwnedpasswords.com/range/{hashed_password[:5]}"
-    response = requests.get(url)
-
-    if response.status_code != 200:
-        raise RuntimeError("Error fetching data from Have I Been Pwned API.")
-
-    hashes = (line.split(':') for line in response.text.splitlines())
-    return any(hashed_password[5:].upper() == h for h, _ in hashes)
-
 def hash_password(password):
     sha1 = hashlib.sha1()
     sha1.update(password.encode('utf-8'))
     return sha1.hexdigest().upper()
 
+def check_password_breach(password):
+    hashed_password = hash_password(password)
+    url = f"https://api.pwnedpasswords.com/range/{hashed_password[:5]}"
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"{Fore.RED}Error fetching data from Have I Been Pwned API: {e}")
+        return False
+
+    hashes = (line.split(':') for line in response.text.splitlines())
+    return any(hashed_password[5:].upper() == h for h, _ in hashes)
+
+def print_welcome_message():
+    description_text = "Password Checker!"
+    ascii_art = pyfiglet.figlet_format(description_text)
+    print(Fore.YELLOW + ascii_art)
+
+    additional_info = (
+        "This tool will help you assess the strength of your password and check "
+        "if it has been exposed in data breaches. Please follow the prompts to "
+        "input your password for evaluation."
+    )
+    print(Fore.YELLOW + additional_info)
+
 def main():
-    password = input("Enter your password: ")
+    print_welcome_message()
+    
+    password = input(Fore.CYAN + "Enter your password: ")
     strength_info = check_password_strength(password)
 
     if strength_info["strength"]:
-        print("Your password is strong!")
+        print(Fore.GREEN + "Your password is strong!")
     else:
-        print("Your password is weak.")
+        print(Fore.RED + "Your password is weak.")
         for suggestion in strength_info["suggestions"]:
-            print(f"- {suggestion}")
+            print(Fore.YELLOW + f"- {suggestion}")
 
     if check_password_breach(password):
-        print("Warning: Your password has been found in a data breach!")
+        print(Fore.RED + "Warning: Your password has been found in a data breach!")
 
 if __name__ == "__main__":
     main()
